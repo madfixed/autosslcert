@@ -1,5 +1,5 @@
 param (
-    [string]$certUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/main/rootCA.pfx",
+    [string]$certUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/main/root-ca.crt",
     [string]$certPassword = "yourpassword"
 )
 

@@ -9,7 +9,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Set up OpenSSL
       run: |
@@ -25,12 +25,12 @@ jobs:
           exit 1
         fi
 
-        openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 3650 -out rootCA.pem -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=mitm.corp"
+        openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 3650 -out rootCA.pem -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=ssl.mitm.com"
         if [ $? -ne 0 ]; then
           echo "Error generating certificate."
           exit 1
         fi
-        
+
         openssl pkcs12 -export -out rootCA.pfx -inkey rootCA.key -in rootCA.pem -passout pass:yourpassword
         if [ $? -ne 0 ]; then
           echo "Error exporting certificate to PFX format."
@@ -39,7 +39,7 @@ jobs:
       shell: bash
 
     - name: Upload Root Certificate
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: rootCA
         path: rootCA.pfx

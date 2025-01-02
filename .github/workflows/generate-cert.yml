@@ -38,8 +38,12 @@ jobs:
         fi
       shell: bash
 
-    - name: Upload Root Certificate
-      uses: actions/upload-artifact@v3
-      with:
-        name: rootCA
-        path: rootCA.pfx
+    - name: Commit Root Certificate
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add rootCA.pfx
+        git commit -m "Add generated rootCA.pfx"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

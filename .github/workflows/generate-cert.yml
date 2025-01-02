@@ -2,48 +2,101 @@ name: Generate Root SSL Certificate
 
 on:
   workflow_dispatch:
+    inputs:
+      regenerate:
+        description: 'Force regenerate certificate'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
 
 jobs:
-  generate-cert:
+  generate-root-cert:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up OpenSSL
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openssl
-      shell: bash
+      - name: Set up OpenSSL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssl
 
-    - name: Generate OpenSSL Root Certificate
-      run: |
-        openssl genrsa -out rootCA.key 2048
-        if [ $? -ne 0 ]; then
-          echo "Error generating private key."
-          exit 1
-        fi
+      - name: Check existing certificate
+        id: check-cert
+        run: |
+          if [ -f "root-ca.key" ] && [ -f "root-ca.crt" ] && [ "${{ github.event.inputs.regenerate }}" == "false" ]; then
+            echo "Certificate already exists. Skipping generation."
+            echo "::set-output name=generate::false"
+          else
+            echo "::set-output name=generate::true"
+          fi
 
-        openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 3650 -out rootCA.pem -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=ssl.mitm.com"
-        if [ $? -ne 0 ]; then
-          echo "Error generating certificate."
-          exit 1
-        fi
+      - name: Generate Root CA
+        if: steps.check-cert.outputs.generate == 'true'
+        run: |
+          # Generate Root CA Private Key
+          openssl genrsa -out root-ca.key 4096
 
-        openssl pkcs12 -export -out rootCA.pfx -inkey rootCA.key -in rootCA.pem -passout pass:yourpassword
-        if [ $? -ne 0 ]; then
-          echo "Error exporting certificate to PFX format."
-          exit 1
-        fi
-      shell: bash
+          # Generate Root CA Certificate
+          openssl req -x509 -new -nodes \
+            -key root-ca.key \
+            -sha256 \
+            -days 3650 \
+            -subj "/C=US/ST=California/L=San Francisco/O=MITMRoot/OU=RootCA/CN=MITMRootCA" \
+            -out root-ca.crt
 
-    - name: Push Root Certificate to Repository
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add rootCA.pfx
-        git commit -m "Add generated rootCA.pfx"
-        git push https://madfixed:${{ secrets.PAT }}@github.com/madfixed/autosslcert.git HEAD:main
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate Intermediate CA
+        if: steps.check-cert.outputs.generate == 'true'
+        run: |
+          # Generate Intermediate CA Private Key
+          openssl genrsa -out intermediate-ca.key 4096
+
+          # Generate Intermediate CA CSR
+          openssl req -new -key intermediate-ca.key \
+            -subj "/C=US/ST=California/L=San Francisco/O=MITMIntermediate/OU=IntermediateCA/CN=MITMIntermediateCA" \
+            -out intermediate-ca.csr
+
+          # Sign Intermediate CA with Root CA
+          openssl x509 -req -in intermediate-ca.csr \
+            -CA root-ca.crt \
+            -CAkey root-ca.key \
+            -CAcreateserial \
+            -out intermediate-ca.crt \
+            -days 3650 \
+            -sha256
+
+      - name: Create README
+        run: |
+          echo "# Root SSL Certificate for MITM
+
+          ## Certificate Details
+          - Root CA Key: \`root-ca.key\`
+          - Root CA Certificate: \`root-ca.crt\`
+          - Intermediate CA Key: \`intermediate-ca.key\`
+          - Intermediate CA Certificate: \`intermediate-ca.crt\`
+
+          ### Usage Warning
+          These certificates are generated for testing and MITM purposes.
+          Do not use in production environments without proper security considerations.
+          " > CERT_README.md
+
+      - name: Commit Certificates
+        run: |
+          git config --global user.name 'Certificate Generator'
+          git config --global user.email 'action@github.com'
+          git add root-ca.key root-ca.crt intermediate-ca.key intermediate-ca.crt CERT_README.md
+          git commit -m "Generate Root and Intermediate SSL Certificates"
+          git push
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ssl-certificates
+          path: |
+            root-ca.key
+            root-ca.crt
+            intermediate-ca.key
+            intermediate-ca.crt
+          retention-days: 5

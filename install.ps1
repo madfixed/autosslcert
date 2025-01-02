@@ -1,6 +1,6 @@
 # Advanced Root Certificate Installation Script
 param(
-    [string]$CertificateUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/refs/heads/main/root-ca.crt?token=GHSAT0AAAAAAC4ALBCWC3RN6NA72W3GXS6AZ3W7QKQ",
+    [string]$CertificateUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/refs/heads/main/root-ca.crt",
     [string]$CertificatePath = "$env:TEMP\root-ca.crt",
     [switch]$Verbose = $false
 )

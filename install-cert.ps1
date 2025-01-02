@@ -1,117 +1,174 @@
-param (
-    [string]$certUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/main/root-ca.crt",
-    [string]$certPassword = "yourpassword"
+# Advanced Root Certificate Installation Script
+param(
+    [string]$CertificateUrl = "https://raw.githubusercontent.com/madfixed/autosslcert/refs/heads/main/root-ca.crt?token=GHSAT0AAAAAAC4ALBCWC3RN6NA72W3GXS6AZ3W7QKQ",
+    [string]$CertificatePath = "$env:TEMP\root-ca.crt",
+    [switch]$Verbose = $false
 )
 
-function Install-Certificate {
-    param (
-        [string]$certPath,
-        [string]$password
-    )
-
-    try {
-        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-        $cert.Import($certPath, $password, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet)
-        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("Root", "LocalMachine")
-        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        $store.Add($cert)
-        $store.Close()
-        Write-Output "Certificate installed in Windows Certificate Store."
-    } catch {
-        Write-Error "Failed to install certificate in Windows Certificate Store: $_"
-        throw
-    }
-}
-
-function Install-Cert-For-Browser {
-    param (
-        [string]$browserProfilesPath,
-        [string]$certPath,
-        [string]$browserName
-    )
-
-    try {
-        $profiles = Get-ChildItem -Path $browserProfilesPath -Directory -ErrorAction SilentlyContinue
-        if ($profiles.Count -gt 0) {
-            foreach ($profile in $profiles) {
-                $profilePath = Join-Path -Path $profile.FullName -ChildPath "Certificates"
-                if (-not (Test-Path -Path $profilePath)) {
-                    New-Item -ItemType Directory -Path $profilePath
-                }
-                Copy-Item -Path $certPath -Destination $profilePath -Force
-            }
-            Write-Output "Certificate installed in $browserName profiles."
-        } else {
-            Write-Output "$browserName is not installed or no profiles found."
+# Logging function
+function Write-Log {
+    param([string]$Message, [switch]$Error)
+    
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "[$timestamp] $Message"
+    
+    if ($Error) {
+        Write-Host $logMessage -ForegroundColor Red
+        Add-Content -Path "$env:TEMP\certificate_install.log" -Value "ERROR: $logMessage"
+    } else {
+        if ($Verbose) {
+            Write-Host $logMessage -ForegroundColor Green
         }
-    } catch {
-        Write-Error "Failed to install certificate in $browserName profiles: $_"
+        Add-Content -Path "$env:TEMP\certificate_install.log" -Value "INFO: $logMessage"
     }
 }
 
-function Install-Cert-Firefox {
-    param (
-        [string]$certPath
-    )
+# Advanced Browser Detection Function
+function Get-InstalledBrowsers {
+    $browsers = @{
+        # Chromium-based browsers
+        "Google Chrome" = @{
+            Paths = @(
+                "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe",
+                "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+                "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+            )
+            Type = "Chromium"
+            CertStore = "$env:LOCALAPPDATA\Google\Chrome\User Data\*\Security\roots"
+        }
+        "Microsoft Edge" = @{
+            Paths = @(
+                "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+                "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
+            )
+            Type = "Chromium"
+            CertStore = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\*\Security\roots"
+        }
+        "Brave Browser" = @{
+            Paths = @(
+                "${env:ProgramFiles}\BraveSoftware\Brave-Browser\Application\brave.exe",
+                "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\Application\brave.exe"
+            )
+            Type = "Chromium"
+            CertStore = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\*\Security\roots"
+        }
+        "Vivaldi" = @{
+            Paths = @(
+                "${env:ProgramFiles}\Vivaldi\Application\vivaldi.exe",
+                "$env:LOCALAPPDATA\Vivaldi\Application\vivaldi.exe"
+            )
+            Type = "Chromium"
+            CertStore = "$env:LOCALAPPDATA\Vivaldi\User Data\*\Security\roots"
+        }
 
+        # Mozilla-based browsers
+        "Mozilla Firefox" = @{
+            Paths = @(
+                "${env:ProgramFiles}\Mozilla Firefox\firefox.exe",
+                "${env:ProgramFiles(x86)}\Mozilla Firefox\firefox.exe"
+            )
+            Type = "Mozilla"
+            CertStore = "$env:APPDATA\Mozilla\Firefox\Profiles\*.default\cert9.db"
+        }
+        "Waterfox" = @{
+            Paths = @(
+                "${env:ProgramFiles}\Waterfox\waterfox.exe",
+                "$env:LOCALAPPDATA\Waterfox\waterfox.exe"
+            )
+            Type = "Mozilla"
+            CertStore = "$env:APPDATA\Waterfox\Profiles\*.default\cert9.db"
+        }
+        "LibreWolf" = @{
+            Paths = @(
+                "${env:ProgramFiles}\LibreWolf\librewolf.exe",
+                "$env:LOCALAPPDATA\LibreWolf\librewolf.exe"
+            )
+            Type = "Mozilla"
+            CertStore = "$env:APPDATA\librewolf\Profiles\*.default\cert9.db"
+        }
+        "Pale Moon" = @{
+            Paths = @(
+                "${env:ProgramFiles}\Pale Moon\palemoon.exe",
+                "$env:LOCALAPPDATA\Pale Moon\palemoon.exe"
+            )
+            Type = "Mozilla"
+            CertStore = "$env:APPDATA\Pale Moon\Profiles\*.default\cert9.db"
+        }
+    }
+
+    $installedBrowsers = @{}
+
+    foreach ($browserName in $browsers.Keys) {
+        $browserInfo = $browsers[$browserName]
+        $exePath = $browserInfo.Paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+        
+        if ($exePath) {
+            $installedBrowsers[$browserName] = @{
+                Path = $exePath
+                Type = $browserInfo.Type
+                CertStore = $browserInfo.CertStore
+            }
+            Write-Log "Detected $browserName at $exePath"
+        }
+    }
+
+    return $installedBrowsers
+}
+
+# Certificate Installation Functions
+function Install-WindowsCertificate {
     try {
-        $firefoxProfiles = Get-ChildItem -Path "$env:APPDATA\Mozilla\Firefox\Profiles" -Directory -ErrorAction SilentlyContinue
-        if ($firefoxProfiles.Count -gt 0) {
-            foreach ($profile in $firefoxProfiles) {
-                $nssDbPath = Join-Path -Path $profile.FullName -ChildPath "cert9.db"
-                if (Test-Path $nssDbPath) {
-                    certutil -A -n "My Root CA" -t "TCu,Cu,Tu" -i $certPath -d sql:$nssDbPath
+        Import-Certificate -FilePath $CertificatePath -CertStoreLocation "Cert:\LocalMachine\Root"
+        Write-Log "Certificate added to Windows Root store successfully"
+    }
+    catch {
+        Write-Log "Failed to add certificate to Windows Root store" -Error
+    }
+}
+
+function Install-BrowserCertificates {
+    $installedBrowsers = Get-InstalledBrowsers
+
+    foreach ($browserName in $installedBrowsers.Keys) {
+        $browser = $installedBrowsers[$browserName]
+        
+        try {
+            switch ($browser.Type) {
+                "Chromium" {
+                    # Chromium browsers typically inherit Windows certificate store
+                    Write-Log "Chromium browser $browserName uses system certificate store"
+                }
+                "Mozilla" {
+                    # Mozilla browsers require certutil
+                    $certDbPaths = Resolve-Path $browser.CertStore
+                    foreach ($certDbPath in $certDbPaths) {
+                        certutil -A -n "Custom Root Certificate" -t "C,C,C" -i $CertificatePath -d $certDbPath
+                        Write-Log "Certificate added to $browserName certificate store"
+                    }
                 }
             }
-            Write-Output "Certificate installed in Firefox profiles."
-        } else {
-            Write-Output "Firefox is not installed or no profiles found."
         }
-    } catch {
-        Write-Error "Failed to install certificate in Firefox profiles: $_"
+        catch {
+            Write-Log "Failed to add certificate to $browserName" -Error
+        }
     }
 }
 
-function Download-Certificate {
-    param (
-        [string]$url,
-        [string]$outputPath
-    )
-
-    try {
-        Invoke-WebRequest -Uri $url -OutFile $outputPath
-        Write-Output "Certificate downloaded successfully."
-    } catch {
-        Write-Error "Failed to download certificate: $_"
-        throw
-    }
-}
-
-function Elevate-Privileges {
-    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
-    exit
-}
-
-# Elevate privileges if not running as administrator
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Elevate-Privileges
-}
-
-# Main script execution
-$certPath = "$env:TEMP\rootCA.pfx"
+# Main Execution
 try {
-    Download-Certificate -url $certUrl -outputPath $certPath
-    Install-Certificate -certPath $certPath -password $certPassword
-    
-    Install-Cert-For-Browser -browserProfilesPath "$env:LOCALAPPDATA\Google\Chrome\User Data" -certPath $certPath -browserName "Chrome"
-    Install-Cert-For-Browser -browserProfilesPath "$env:LOCALAPPDATA\Microsoft\Edge\User Data" -certPath $certPath -browserName "Edge"
-    Install-Cert-For-Browser -browserProfilesPath "$env:APPDATA\Opera Software\Opera Stable" -certPath $certPath -browserName "Opera"
-    Install-Cert-For-Browser -browserProfilesPath "$env:LOCALAPPDATA\Yandex\YandexBrowser\User Data" -certPath $certPath -browserName "Yandex Browser"
-    Install-Cert-For-Browser -browserProfilesPath "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data" -certPath $certPath -browserName "Brave"
-    Install-Cert-For-Browser -browserProfilesPath "$env:LOCALAPPDATA\Vivaldi\User Data" -certPath $certPath -browserName "Vivaldi"
-    Install-Cert-Firefox -certPath $certPath
-    
-    Write-Output "Certificate installation process completed."
-} catch {
-    Write-Error "An error occurred: $_"
+    # Download Certificate
+    Invoke-WebRequest -Uri $CertificateUrl -OutFile $CertificatePath
+
+    # Install Certificates
+    Install-WindowsCertificate
+    Install-BrowserCertificates
+
+    Write-Log "Certificate installation completed successfully"
+}
+catch {
+    Write-Log "Certificate installation failed" -Error
+}
+finally {
+    # Clean up
+    Remove-Item $CertificatePath -ErrorAction SilentlyContinue
 }

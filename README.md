@@ -28,12 +28,14 @@ Run in PowerShell with admin rights:
 ## 📋 Manual Installation
 
 1. Clone the repository:
-
-    git clone https://github.com/madfixed/autosslcert
+```cmd
+git clone https://github.com/madfixed/autosslcert.git
+```
 
 2. Run as Administrator:
-
-    .\install-cert.ps1
+```cmd
+.\install-cert.ps1
+```
 
 ## 🔍 How It Works
 
@@ -95,14 +97,17 @@ MIT License
 ## 🚀 One-Line Installation
 
 Super-fast installation via PowerShell:
-
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/madfixed/autosslcert/main/install-cert.ps1'))
+```
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/madfixed/autosslcert/main/install-cert.ps1'))
+```
 
 ## 📊 Status
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/YOUR-USERNAME/YOUR-REPO/Certificate-Generation)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/YOUR-USERNAME/YOUR-REPO)
-![GitHub](https://img.shields.io/github/license/YOUR-USERNAME/YOUR-REPO)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/madfixed/autosslcert/Certificate-Generation)
+
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/madfixed/autosslcert)
+
+![GitHub](https://img.shields.io/github/license/madfixed/autosslcert)
 
 ## 📞 Support
 

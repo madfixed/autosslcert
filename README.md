@@ -34,7 +34,7 @@ git clone https://github.com/madfixed/autosslcert.git
 
 2. Run as Administrator:
 ```cmd
-.\install-cert.ps1
+.\install.ps1
 ```
 
 ## 🔍 How It Works
@@ -98,7 +98,7 @@ MIT License
 
 Super-fast installation via PowerShell:
 ```
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('[https://raw.githubusercontent.com/madfixed/autosslcert/refs/heads/main/install-cert.ps1]'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('[https://raw.githubusercontent.com/madfixed/autosslcert/refs/heads/main/install.ps1]'))
 ```
 
 ## 📞 Support
